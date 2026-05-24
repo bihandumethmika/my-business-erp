@@ -8,8 +8,8 @@ from email.mime.base import MIMEBase
 from email import encoders
 from datetime import datetime
 
-# 1. DATABASE & SECURITY SETUP (V4 WITH CUSTOM NAMES)
-DB_FILE = "uthsahaya_erp_v4.db"
+# 1. DATABASE & SECURITY SETUP
+DB_FILE = "uthsahaya_erp_v6.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -35,7 +35,6 @@ def init_db():
         )
     ''')
     
-    # Auto-populate configured businesses with custom names
     try:
         c.execute("INSERT INTO users VALUES ('owner', 'admin123', 'Owner', 'All')")
         c.execute("INSERT INTO users VALUES ('staff1', 'staff123', 'Staff', 'Uthsahaya Timber Mills')")
@@ -79,10 +78,9 @@ def send_monthly_report_email(receiver_email, business_name, report_csv_string):
         st.error(f"Network Email Exception: {e}")
         return False
 
-# 3. INTERFACE CONFIGURATION & PREMIUM GRAPHICS THEME
+# 3. INTERFACE CONFIGURATION & PREMIUM GRAPHICS THEMES
 st.set_page_config(page_title="Uthsahaya Group ERP", layout="wide")
 
-# Custom UI Styling Injection
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -90,7 +88,7 @@ st.markdown("""
     h3 { color: #f0f2f6; }
     .stButton>button { background-color: #ffd700; color: #0e1117; font-weight: bold; border-radius: 8px; border: none; width: 100%; transition: 0.3s; }
     .stButton>button:hover { background-color: #e6c200; transform: scale(1.02); }
-    .metric-card { background: linear-gradient(135deg, #1e222b 0%, #11141a 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #ffd700; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    .metric-card { background: linear-gradient(135deg, #1e222b 0%, #11141a 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #ffd700; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 15px; }
     .metric-title { color: #8a92a6; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
     .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
     </style>
@@ -108,31 +106,29 @@ if "logged_in" not in st.session_state:
 
 # 4. LUXURY AUTHENTICATION INTERFACE
 if not st.session_state.logged_in:
-    columns = st.columns([1, 2, 1])
-    with columns[1]:
-        st.markdown("<div style='background-color: #1c202a; padding: 30px; border-radius: 15px; border: 1px solid #2d323f;'>", unsafe_allowed_html=True)
-        st.subheader("🔒 Secure Portal Gateway")
-        with st.form("login_form", clear_on_submit=False):
-            username_input = st.text_input("📊 User ID / පරිශීලක නාමය")
-            password_input = st.text_input("🔑 Security Key / මුරපදය", type="password")
-            login_btn = st.form_submit_button("AUTHORIZE ACCESS")
+    st.markdown("<div style='background-color: #1c202a; padding: 30px; border-radius: 15px; border: 1px solid #2d323f; max-width: 500px; margin: 0 auto;'>", unsafe_allowed_html=True)
+    st.subheader("🔒 Secure Portal Gateway")
+    with st.form("login_form", clear_on_submit=False):
+        username_input = st.text_input("📊 User ID / පරිශීලක නාමය")
+        password_input = st.text_input("🔑 Security Key / මුරපදය", type="password")
+        login_btn = st.form_submit_button("AUTHORIZE ACCESS")
+        
+        if login_btn:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            c.execute("SELECT role, assigned_business FROM users WHERE username=? AND password=?", (username_input, password_input))
+            user_data = c.fetchone()
+            conn.close()
             
-            if login_btn:
-                conn = sqlite3.connect(DB_FILE)
-                c = conn.cursor()
-                c.execute("SELECT role, assigned_business FROM users WHERE username=? AND password=?", (username_input, password_input))
-                user_data = c.fetchone()
-                conn.close()
-                
-                if user_data:
-                    st.session_state.logged_in = True
-                    st.session_state.username = username_input
-                    st.session_state.role = user_data[0]
-                    st.session_state.assigned_business = user_data[1]
-                    st.rerun()
-                else:
-                    st.error("❌ Invalid Access Credentials. Security breach log updated.")
-        st.markdown("</div>", unsafe_allowed_html=True)
+            if user_data:
+                st.session_state.logged_in = True
+                st.session_state.username = username_input
+                st.session_state.role = user_data[0]
+                st.session_state.assigned_business = user_data[1]
+                st.rerun()
+            else:
+                st.error("❌ Invalid Access Credentials.")
+    st.markdown("</div>", unsafe_allowed_html=True)
 
 # 5. ENTERPRISE ACTIVE PORTAL
 else:
@@ -174,7 +170,7 @@ else:
                 ''', (business_scope, entry_date.strftime("%Y-%m-%d"), entry_type, category, amount, description, st.session_state.username))
                 conn.commit()
                 conn.close()
-                st.success(f"✅ Data localized and encrypted into {business_scope} Database ledger!")
+                st.success(f"✅ Data localized into {business_scope} Database ledger!")
 
     # OWNER PORTAL (EXECUTIVE LEVEL HQ COCKPIT)
     elif st.session_state.role == "Owner":
@@ -200,18 +196,17 @@ else:
             biz_df = data_df[data_df['business_name'] == selected_business]
             
             if biz_df.empty:
-                st.info(f"ℹ️ {selected_business} possesses no active logs for this duration.")
+                st.info(f"ℹ️ {selected_business} possesses no active logs for this duration. Please enter some data from Staff accounts first.")
             else:
-                # Calculate Core Figures
                 pnl = biz_df.pivot_table(index='Month', columns='type', values='amount', aggfunc='sum').fillna(0)
                 if "Income (ආදායම)" not in pnl.columns: pnl["Income (ආදායම)"] = 0.0
                 if "Expense (වියදම)" not in pnl.columns: pnl["Expense (වියදම)"] = 0.0
                 pnl['Net Profit/Loss'] = pnl['Income (ආදායම)'] - pnl['Expense (වියදම)']
                 
-                # INFOGRAPHICS DISPLAY MATRIX CARDS (Premium UI Metrics)
                 latest_income = pnl["Income (ආදායම)"].iloc[-1]
                 latest_expense = pnl["Expense (වියදම)"].iloc[-1]
                 latest_pnl = pnl['Net Profit/Loss'].iloc[-1]
                 
+                # HTML Metric Cards Render
                 m_col1, m_col2, m_col3 = st.columns(3)
-                with m_col1:
+                m_col1.markdown(f"<div class='metric-card'><div class='metric-title'>📈 Gross Revenue ({pnl.index[-1]})</div><div class='metric-value' style='color:#00ff66;'>LKR {latest_income:,.2f}</div></div>", unsafe_allowed_html=True)
