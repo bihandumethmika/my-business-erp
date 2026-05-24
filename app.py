@@ -8,8 +8,8 @@ from email.mime.base import MIMEBase
 from email import encoders
 from datetime import datetime
 
-# 1. DATABASE & SECURITY SETUP
-DB_FILE = "uthsahaya_erp_v7.db"
+# 1. DATABASE SETUP
+DB_FILE = "uthsahaya_erp_v8.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -35,6 +35,7 @@ def init_db():
         )
     ''')
     
+    # Default Credentials
     try:
         c.execute("INSERT INTO users VALUES ('owner', 'admin123', 'Owner', 'All')")
         c.execute("INSERT INTO users VALUES ('staff1', 'staff123', 'Staff', 'Uthsahaya Timber Mills')")
@@ -48,7 +49,7 @@ def init_db():
 
 init_db()
 
-# 2. EMAIL NOTIFICATION BROADCASTER
+# 2. EMAIL SENDER
 def send_monthly_report_email(receiver_email, business_name, report_csv_string):
     sender_email = "your_gmail@gmail.com"
     sender_password = "xxxx xxxx xxxx xxxx"
@@ -78,9 +79,8 @@ def send_monthly_report_email(receiver_email, business_name, report_csv_string):
         st.error(f"Email Error: {e}")
         return False
 
-# 3. INTERFACE CONFIGURATION
+# 3. PAGE INITIALIZATION
 st.set_page_config(page_title="Uthsahaya Group ERP", layout="wide")
-
 st.title("🔱 Uthsahaya Holdings Management System")
 st.write("Automated Multi-Business Financial Intelligence & Registry System")
 st.write("---")
@@ -91,7 +91,7 @@ if "logged_in" not in st.session_state:
     st.session_state.role = ""
     st.session_state.assigned_business = ""
 
-# 4. AUTHENTICATION INTERFACE
+# 4. LOGIN PORTAL
 if not st.session_state.logged_in:
     st.subheader("🔒 Secure Portal Gateway / ඇතුල් වීම")
     with st.form("login_form", clear_on_submit=False):
@@ -115,7 +115,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("❌ Invalid Access Credentials.")
 
-# 5. ACTIVE PORTAL DASHBOARD
+# 5. LOGGED IN DASHBOARD
 else:
     st.sidebar.title(f"👤 {st.session_state.username}")
     st.sidebar.write(f"**Role:** {st.session_state.role}")
@@ -129,7 +129,7 @@ else:
         conn.close()
         return df
 
-    # STAFF PORTAL (DAILY DATA ENTRY)
+    # STAFF PORTAL
     if st.session_state.role == "Staff":
         business_scope = st.session_state.assigned_business
         st.subheader(f"📝 Registry Desk — 【 {business_scope} 】")
@@ -157,38 +157,38 @@ else:
                 conn.close()
                 st.success("✅ Data saved successfully!")
 
-    # OWNER PORTAL (EXECUTIVEHQ)
+    # OWNER PORTAL
     elif st.session_state.role == "Owner":
-        st.subheader("📈 Executive Command Headquarters & Analytics Cockpit")
         
+        # NAVIGATION ALWAYS AVAILABLE NOW
         businesses_list = [
             "Uthsahaya Timber Mills", 
             "Uthsahaya Furniture", 
             "Uthsahaya Imported Timber", 
             "Uthsahaya Transport Service"
         ]
-        selected_business = st.selectbox("🎯 Select Business Ledger to Audit", businesses_list)
-        st.write("---")
         
-        data_df = get_filtered_records()
+        tabs = st.tabs(["📊 Financial Analytics HQ", "⚙️ Staff User Settings"])
         
-        if data_df.empty:
-            st.warning("⚠️ No data streams found in the server. Please enter data from Staff accounts first.")
-        else:
-            data_df['date'] = pd.to_datetime(data_df['date'])
-            data_df['Month'] = data_df['date'].dt.to_period('M').astype(str)
+        with tabs[0]:
+            selected_business = st.selectbox("🎯 Select Business Ledger to Audit", businesses_list)
+            st.write("---")
             
-            biz_df = data_df[data_df['business_name'] == selected_business]
+            data_df = get_filtered_records()
+            biz_df = data_df[data_df['business_name'] == selected_business] if not data_df.empty else pd.DataFrame()
             
             if biz_df.empty:
-                st.info(f"ℹ️ {selected_business} possesses no active logs. Please enter some data from Staff accounts first.")
+                st.warning(f"⚠️ {selected_business} සඳහා තවමත් කිසිදු මූල්‍ය දත්තයක් ඇතුළත් කර නැත. කරුණාකර Staff සාමාජිකයෙකු ලෙස ලොග් වී දත්ත ඇතුළත් කරන්න.")
             else:
+                data_df['date'] = pd.to_datetime(data_df['date'])
+                data_df['Month'] = data_df['date'].dt.to_period('M').astype(str)
+                biz_df = data_df[data_df['business_name'] == selected_business]
+                
                 pnl = biz_df.pivot_table(index='Month', columns='type', values='amount', aggfunc='sum').fillna(0)
                 if "Income (ආදායම)" not in pnl.columns: pnl["Income (ආදායම)"] = 0.0
                 if "Expense (වියදම)" not in pnl.columns: pnl["Expense (වියදම)"] = 0.0
                 pnl['Net Profit/Loss'] = pnl['Income (ආදායම)'] - pnl['Expense (වියදම)']
                 
-                # Standard Metrics
                 latest_month = pnl.index[-1]
                 m_col1, m_col2, m_col3 = st.columns(3)
                 m_col1.metric(f"📈 Total Revenue ({latest_month})", f"LKR {pnl['Income (ආදායම)'].iloc[-1]:,.2f}")
@@ -196,9 +196,7 @@ else:
                 m_col3.metric("🔱 Net Profit / Loss", f"LKR {pnl['Net Profit/Loss'].iloc[-1]:,.2f}")
                 
                 st.write("---")
-                
-                # CHARTS & TABLES
-                st.write("#### 📊 Financial Trend Projections Graph (ආදායම්/වියදම් ප්‍රස්ථාරය)")
+                st.write("#### 📊 Financial Trend Projections Graph")
                 st.bar_chart(pnl[['Income (ආදායම)', 'Expense (වියදම)', 'Net Profit/Loss']])
                 
                 st.write("#### 📑 Ledger Overview Matrix Table")
@@ -210,15 +208,22 @@ else:
                 
                 st.write("---")
                 st.subheader("🚀 Automated Notification Gateway")
-                
                 col1, col2 = st.columns(2)
                 with col1:
                     owner_email_input = st.text_input("Enter Destination Email Address", "owner@example.com")
                     if st.button("📧 BROADCAST STATEMENT VIA EMAIL"):
                         if send_monthly_report_email(owner_email_input, selected_business, csv_string):
                             st.success(f"📬 Report safely dispatched to {owner_email_input}!")
-                
                 with col2:
                     owner_phone_input = st.text_input("Enter Mobile Target Line", "077XXXXXXXX")
                     if st.button("💬 PUSH SUMMARY (SMS)"):
                         st.success(f"📱 SMS abstract pushed successfully!")
+
+        with tabs[1]:
+            st.subheader("⚙️ Staff User Management System")
+            st.info("පද්ධතියට දත්ත ඇතුළත් කරන සේවකයින්ගේ ගිණුම් (Staff Logins) මෙතැනින් කළමනාකරණය කරන්න.")
+            
+            with st.form("add_user_form"):
+                new_user = st.text_input("Username (නව පරිශීලක නාමය)")
+                new_pass = st.text_input("Password (මුරපදය)")
+                biz_assign = st.selectbox("Assign Business (අදාළ ව්‍යාපාරය)", businesses_list)
