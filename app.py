@@ -9,7 +9,7 @@ from email import encoders
 from datetime import datetime
 
 # 1. DATABASE SETUP
-DB_FILE = "uthsahaya_erp_v8.db"
+DB_FILE = "uthsahaya_erp_v9.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -30,18 +30,14 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT,
-            role TEXT,
-            assigned_business TEXT
+            role TEXT
         )
     ''')
     
-    # Default Credentials
+    # Default Master Credentials
     try:
-        c.execute("INSERT INTO users VALUES ('owner', 'admin123', 'Owner', 'All')")
-        c.execute("INSERT INTO users VALUES ('staff1', 'staff123', 'Staff', 'Uthsahaya Timber Mills')")
-        c.execute("INSERT INTO users VALUES ('staff2', 'staff456', 'Staff', 'Uthsahaya Furniture')")
-        c.execute("INSERT INTO users VALUES ('staff3', 'staff789', 'Staff', 'Uthsahaya Imported Timber')")
-        c.execute("INSERT INTO users VALUES ('staff4', 'staff000', 'Staff', 'Uthsahaya Transport Service')")
+        c.execute("INSERT INTO users VALUES ('owner', 'admin123', 'Owner')")
+        c.execute("INSERT INTO users VALUES ('staff1', 'staff123', 'Staff')")
     except sqlite3.IntegrityError:
         pass
     conn.commit()
@@ -89,7 +85,13 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ""
     st.session_state.role = ""
-    st.session_state.assigned_business = ""
+
+businesses_list = [
+    "Uthsahaya Timber Mills", 
+    "Uthsahaya Furniture", 
+    "Uthsahaya Imported Timber", 
+    "Uthsahaya Transport Service"
+]
 
 # 4. LOGIN PORTAL
 if not st.session_state.logged_in:
@@ -102,7 +104,7 @@ if not st.session_state.logged_in:
         if login_btn:
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
-            c.execute("SELECT role, assigned_business FROM users WHERE username=? AND password=?", (username_input, password_input))
+            c.execute("SELECT role FROM users WHERE username=? AND password=?", (username_input, password_input))
             user_data = c.fetchone()
             conn.close()
             
@@ -110,7 +112,6 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.username = username_input
                 st.session_state.role = user_data[0]
-                st.session_state.assigned_business = user_data[1]
                 st.rerun()
             else:
                 st.error("❌ Invalid Access Credentials.")
@@ -129,22 +130,24 @@ else:
         conn.close()
         return df
 
-    # STAFF PORTAL
+    # 📝 ---------------- STAFF PORTAL (ANY USER CAN SELECT ANY BUSINESS NOW) ----------------
     if st.session_state.role == "Staff":
-        business_scope = st.session_state.assigned_business
-        st.subheader(f"📝 Registry Desk — 【 {business_scope} 】")
+        st.subheader("📝 Daily Data Entry Desk (දිනපතා ආදායම්/වියදම් ඇතුළත් කිරීම)")
+        
+        # මෙන්න මෙතනින් Staff සාමාජිකයාට ඕනෑම ව්‍යාපාරයක් තෝරාගන්න පුළුවන්
+        target_business = st.selectbox("🎯 ව්‍යාපාරය තෝරන්න (Select Business to Add Data)", businesses_list)
         
         with st.form("staff_entry_form", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
                 entry_date = st.date_input("Date (දිනය)", datetime.now())
-                entry_type = st.selectbox("Transaction Flow (වර්ගය)", ["Income (ආදායම)", "Expense (වියදම)"])
+                entry_type = st.selectbox("Transaction Flow (වර්ගය)", ["Income (ආදායම)", ["Expense (වියදම)"]])
             with col_b:
                 category = st.text_input("Category Head (උදා: Sales, Bill, Salary)")
                 amount = st.number_input("Amount (LKR)", min_value=0.0, format="%.2f")
             
             description = st.text_area("Notes / විස්තර")
-            submit_btn = st.form_submit_button("SUBMIT RECORD")
+            submit_btn = st.form_submit_button(f"SAVE RECORD TO {target_business.upper()}")
             
             if submit_btn and category and amount > 0:
                 conn = sqlite3.connect(DB_FILE)
@@ -152,33 +155,26 @@ else:
                 c.execute('''
                     INSERT INTO records (business_name, date, type, category, amount, description, entered_by)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (business_scope, entry_date.strftime("%Y-%m-%d"), entry_type, category, amount, description, st.session_state.username))
+                ''', (target_business, entry_date.strftime("%Y-%m-%d"), entry_type, category, amount, description, st.session_state.username))
                 conn.commit()
                 conn.close()
-                st.success("✅ Data saved successfully!")
+                st.success(f"✅ Data successfully saved under 【{target_business}】 ledger!")
 
-    # OWNER PORTAL
+    # 📈 ---------------- OWNER PORTAL (EXECUTIVE HEADQUARTERS) ----------------
     elif st.session_state.role == "Owner":
+        tabs = st.tabs(["📊 Financial Analytics HQ", "📝 Master Data Entry Gates", "⚙️ Staff User Settings"])
         
-        # NAVIGATION ALWAYS AVAILABLE NOW
-        businesses_list = [
-            "Uthsahaya Timber Mills", 
-            "Uthsahaya Furniture", 
-            "Uthsahaya Imported Timber", 
-            "Uthsahaya Transport Service"
-        ]
-        
-        tabs = st.tabs(["📊 Financial Analytics HQ", "⚙️ Staff User Settings"])
-        
+        # TAB 1: FULL FINANCIAL REPORTS FOR OWNER
         with tabs[0]:
-            selected_business = st.selectbox("🎯 Select Business Ledger to Audit", businesses_list)
+            st.subheader("📈 Executive Command Headquarters & Analytics")
+            selected_business = st.selectbox("🎯 View Audits For", businesses_list)
             st.write("---")
             
             data_df = get_filtered_records()
             biz_df = data_df[data_df['business_name'] == selected_business] if not data_df.empty else pd.DataFrame()
             
             if biz_df.empty:
-                st.warning(f"⚠️ {selected_business} සඳහා තවමත් කිසිදු මූල්‍ය දත්තයක් ඇතුළත් කර නැත. කරුණාකර Staff සාමාජිකයෙකු ලෙස ලොග් වී දත්ත ඇතුළත් කරන්න.")
+                st.warning(f"⚠️ {selected_business} සඳහා තවමත් කිසිදු මූල්‍ය දත්තයක් ඇතුළත් කර නැත.")
             else:
                 data_df['date'] = pd.to_datetime(data_df['date'])
                 data_df['Month'] = data_df['date'].dt.to_period('M').astype(str)
@@ -219,11 +215,14 @@ else:
                     if st.button("💬 PUSH SUMMARY (SMS)"):
                         st.success(f"📱 SMS abstract pushed successfully!")
 
+        # TAB 2: OWNER CAN ALSO ENTER DATA FOR ANY BUSINESS
         with tabs[1]:
-            st.subheader("⚙️ Staff User Management System")
-            st.info("පද්ධතියට දත්ත ඇතුළත් කරන සේවකයින්ගේ ගිණුම් (Staff Logins) මෙතැනින් කළමනාකරණය කරන්න.")
+            st.subheader("📝 Master Data Entry Gate (Owner)")
+            owner_target_biz = st.selectbox("🎯 ව්‍යාපාරය තෝරන්න (Select Business to Insert Record)", businesses_list, key="owner_biz_sel")
             
-            with st.form("add_user_form"):
-                new_user = st.text_input("Username (නව පරිශීලක නාමය)")
-                new_pass = st.text_input("Password (මුරපදය)")
-                biz_assign = st.selectbox("Assign Business (අදාළ ව්‍යාපාරය)", businesses_list)
+            with st.form("owner_entry_form", clear_on_submit=True):
+                col_c, col_d = st.columns(2)
+                with col_c:
+                    o_date = st.date_input("Date (දිනය)", datetime.now(), key="o_date")
+                    o_type = st.selectbox("Transaction Flow (වර්ගය)", ["Income (ආදායම)", "Expense (වියදම)"], key="o_type")
+                with col_d:
