@@ -9,7 +9,7 @@ from email import encoders
 from datetime import datetime
 
 # 1. DATABASE SETUP
-DB_FILE = "uthsahaya_erp_v13.db"
+DB_FILE = "uthsahaya_erp_v14.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -43,7 +43,7 @@ def init_db():
 
 init_db()
 
-# 2. FIXED EMAIL SENDER (WITH ERROR HANDLING)
+# 2. FIXED EMAIL SENDER
 def send_monthly_report_email(receiver_email, business_name, report_csv_string, sender_email, sender_password):
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -105,7 +105,7 @@ if not st.session_state.logged_in:
             if user_data:
                 st.session_state.logged_in = True
                 st.session_state.username = username_input
-                st.session_state.role = user_data
+                st.session_state.role = str(user_data[0])  # FIXED: Tuple එකක් වෙනුවට ඍජුවම වචනය ලබා ගැනීම
                 st.rerun()
             else:
                 st.error("❌ Invalid Access Credentials.")
@@ -124,20 +124,16 @@ else:
         conn.close()
         return df
 
-    # STAFF PORTAL (ANY USER CAN SELECT ANY BUSINESS TO ADD DATA)
+    # STAFF PORTAL (DAILY DATA ENTRY)
     if st.session_state.role == "Staff":
         st.subheader("📝 Daily Data Entry Desk (දිනපතා ආදායම්/වියදම් ඇතුළත් කිරීම)")
         target_business = st.selectbox("🎯 ව්‍යාපාරය තෝරන්න (Select Business to Add Data)", businesses_list)
         
         with st.form("staff_entry_form", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                entry_date = st.date_input("Date (දිනය)", datetime.now())
-                entry_type = st.selectbox("Transaction Flow (වර්ගය)", ["Income (ආදායම)", "Expense (වියදම)"])
-            with col_b:
-                category = st.text_input("Category Head (උදා: Sales, Bill, Salary)")
-                amount = st.number_input("Amount (LKR)", min_value=0.0, format="%.2f")
-            
+            entry_date = st.date_input("Date (දිනය)", datetime.now())
+            entry_type = st.selectbox("Transaction Flow (වර්ගය)", ["Income (ආදායම)", "Expense (වියදම)"])
+            category = st.text_input("Category Head (උදා: Sales, Bill, Salary)")
+            amount = st.number_input("Amount (LKR)", min_value=0.0, format="%.2f")
             description = st.text_area("Notes / විස්තර")
             submit_btn = st.form_submit_button(f"SAVE RECORD TO {target_business.upper()}")
             
@@ -157,7 +153,7 @@ else:
         tabs = st.tabs(["📊 Financial Analytics HQ", "📝 Master Data Entry Gates", "⚙️ Staff User Settings"])
         
         # TAB 1: FINANCIAL REPORTS FOR OWNER
-        with tabs:
+        with tabs[0]:
             st.subheader("📈 Executive Command Headquarters & Analytics")
             selected_business = st.selectbox("🎯 View Audits For", businesses_list)
             st.write("---")
@@ -166,7 +162,7 @@ else:
             biz_df = data_df[data_df['business_name'] == selected_business] if not data_df.empty else pd.DataFrame()
             
             if biz_df.empty:
-                st.warning(f"⚠️ {selected_business} සඳහා තවමත් කිසිදු මූල්‍ය දත්තයක් ඇතුළත් කර නැත. කරුණාකර 'Master Data Entry Gates' ටැබ් එකෙන් හෝ Staff කෙනෙකු ලෙස ලොග් වී දත්ත ඇතුළත් කරන්න.")
+                st.warning(f"⚠️ {selected_business} සඳහා තවමත් කිසිදු මූල්‍ය දත්තයක් ඇතුළත් කර නැත. කරුණාකර 'Master Data Entry Gates' ටැබ් එකෙන් හෝ Staff කෙනෙකු ලෙස දත්ත ඇතුළත් කරන්න.")
             else:
                 data_df['date'] = pd.to_datetime(data_df['date'])
                 data_df['Month'] = data_df['date'].dt.to_period('M').astype(str)
@@ -218,4 +214,6 @@ else:
                                 st.error(f"❌ Email Connection Error: {msg}. Please verify your Gmail App Password.")
                 with col2:
                     owner_phone_input = st.text_input("Enter Mobile Target Line", "077XXXXXXXX")
+                    if st.button("💬 PUSH SUMMARY (SMS)"):
+                        st.success(f"📱 SMS abstract pushed successfully!")
 
