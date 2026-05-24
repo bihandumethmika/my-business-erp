@@ -9,7 +9,7 @@ from email import encoders
 from datetime import datetime
 
 # 1. DATABASE SETUP
-DB_FILE = "uthsahaya_erp_v9.db"
+DB_FILE = "uthsahaya_erp_v10.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -112,6 +112,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.username = username_input
                 st.session_state.role = user_data[0]
+                st.author_data = user_data
                 st.rerun()
             else:
                 st.error("❌ Invalid Access Credentials.")
@@ -130,18 +131,17 @@ else:
         conn.close()
         return df
 
-    # 📝 ---------------- STAFF PORTAL (ANY USER CAN SELECT ANY BUSINESS NOW) ----------------
+    # STAFF PORTAL (ANY USER CAN SELECT ANY BUSINESS TO ADD DATA)
     if st.session_state.role == "Staff":
         st.subheader("📝 Daily Data Entry Desk (දිනපතා ආදායම්/වියදම් ඇතුළත් කිරීම)")
         
-        # මෙන්න මෙතනින් Staff සාමාජිකයාට ඕනෑම ව්‍යාපාරයක් තෝරාගන්න පුළුවන්
         target_business = st.selectbox("🎯 ව්‍යාපාරය තෝරන්න (Select Business to Add Data)", businesses_list)
         
         with st.form("staff_entry_form", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
                 entry_date = st.date_input("Date (දිනය)", datetime.now())
-                entry_type = st.selectbox("Transaction Flow (වර්ගය)", ["Income (ආදායම)", ["Expense (වියදම)"]])
+                entry_type = st.selectbox("Transaction Flow (වර්ගය)", ["Income (ආදායම)", "Expense (වියදම)"])
             with col_b:
                 category = st.text_input("Category Head (උදා: Sales, Bill, Salary)")
                 amount = st.number_input("Amount (LKR)", min_value=0.0, format="%.2f")
@@ -160,11 +160,11 @@ else:
                 conn.close()
                 st.success(f"✅ Data successfully saved under 【{target_business}】 ledger!")
 
-    # 📈 ---------------- OWNER PORTAL (EXECUTIVE HEADQUARTERS) ----------------
+    # OWNER PORTAL (EXECUTIVE HEADQUARTERS)
     elif st.session_state.role == "Owner":
         tabs = st.tabs(["📊 Financial Analytics HQ", "📝 Master Data Entry Gates", "⚙️ Staff User Settings"])
         
-        # TAB 1: FULL FINANCIAL REPORTS FOR OWNER
+        # TAB 1: FINANCIAL REPORTS FOR OWNER
         with tabs[0]:
             st.subheader("📈 Executive Command Headquarters & Analytics")
             selected_business = st.selectbox("🎯 View Audits For", businesses_list)
@@ -174,7 +174,7 @@ else:
             biz_df = data_df[data_df['business_name'] == selected_business] if not data_df.empty else pd.DataFrame()
             
             if biz_df.empty:
-                st.warning(f"⚠️ {selected_business} සඳහා තවමත් කිසිදු මූල්‍ය දත්තයක් ඇතුළත් කර නැත.")
+                st.warning(f"⚠️ {selected_business} සඳහා තවමත් කිසිදු මූල්‍ය දත්තයක් ඇතුළත් කර නැත. කරුණාකර 'Master Data Entry Gates' ටැබ් එකෙන් හෝ Staff කෙනෙකු ලොග් වී දත්ත ඇතුළත් කරන්න.")
             else:
                 data_df['date'] = pd.to_datetime(data_df['date'])
                 data_df['Month'] = data_df['date'].dt.to_period('M').astype(str)
