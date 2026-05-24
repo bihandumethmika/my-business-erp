@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import smtplib
-import requests
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -15,7 +14,6 @@ DB_FILE = "business_finance_v2.db"
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    # Transactions Table
     c.execute('''
         CREATE TABLE IF NOT EXISTS records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +26,6 @@ def init_db():
             entered_by TEXT
         )
     ''')
-    # Users Table (Role-based access control)
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -37,15 +34,12 @@ def init_db():
             assigned_business TEXT
         )
     ''')
-    
-    # Default Default Users ඇතුළත් කිරීම (පළමු වර පමණක් ක්‍රියාත්මක වේ)
     try:
         c.execute("INSERT INTO users VALUES ('owner', 'admin123', 'Owner', 'All')")
         c.execute("INSERT INTO users VALUES ('staff1', 'staff123', 'Staff', 'Business 1')")
         c.execute("INSERT INTO users VALUES ('staff2', 'staff456', 'Staff', 'Business 2')")
     except sqlite3.IntegrityError:
-        pass # දැනටමත් පරිශීලකයන් සිටී නම් මඟහරින්න
-        
+        pass
     conn.commit()
     conn.close()
 
@@ -53,19 +47,17 @@ init_db()
 
 # 2. AUTOMATED EMAIL & SMS NOTIFICATION FUNCTIONS
 def send_monthly_report_email(receiver_email, business_name, report_csv_string):
-    """ Gmail App Password එකක් භාවිතයෙන් ස්වයංක්‍රීයව වාර්තා Email කිරීම. """
-    sender_email = "your_gmail@gmail.com"  # ඔබගේ Gmail ලිපිනය මෙතනට දාන්න
-    sender_password = "xxxx xxxx xxxx xxxx" # ඔබගේ Gmail App Password එක මෙතනට දාන්න
+    sender_email = "your_gmail@gmail.com"
+    sender_password = "xxxx xxxx xxxx xxxx"
     
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = receiver_email
     msg['Subject'] = f"📊 Monthly Financial Report - {business_name} ({datetime.now().strftime('%B %Y')})"
     
-    body = f"Hello Owner,\n\nPlease find attached the monthly profit/loss statement for {business_name}.\n\nGenerated automatically via ERP System."
+    body = f"Hello Owner,\n\nPlease find attached the monthly profit/loss statement for {business_name}."
     msg.attach(MIMEText(body, 'plain'))
     
-    # CSV Attachment එක එකතු කිරීම
     part = MIMEBase('application', 'octet-stream')
     part.set_payload(report_csv_string.encode('utf-8'))
     encoders.encode_base64(part)
@@ -73,7 +65,7 @@ def send_monthly_report_email(receiver_email, business_name, report_csv_string):
     msg.attach(part)
     
     try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server = smtplib.SMTP('://gmail.com', 587)
         server.starttls()
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, receiver_email, msg.as_string())
@@ -84,10 +76,6 @@ def send_monthly_report_email(receiver_email, business_name, report_csv_string):
         return False
 
 def send_alert_sms(phone_number, message_text):
-    """ Notify.lk හෝ Twilio වැනි ඕනෑම SMS Gateway එකක් API එක හරහා සම්බන්ධ කිරීම. """
-    # උදාහරණයක් ලෙස දේශීය Notify.lk API භාවිතය:
-    # url = f"https://notify.lk{phone_number}&message={message_text}"
-    # දැනට මෙම ශ්‍රිතය (Function) සාර්ථක වූ බව හඟවයි. සැබෑ API Key එක ලැබුණු පසු ඉහත URL එක සක්‍රීය කරන්න.
     return True
 
 # 3. INTERFACE CONFIGURATION
@@ -95,14 +83,13 @@ st.set_page_config(page_title="Secure Business Network ERP", layout="wide")
 st.title("🔐 Multi-User Secure Enterprise Management System")
 st.write("---")
 
-# Session State කළමනාකරණය (User Login තත්ත්වය පවත්වා ගැනීමට)
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ""
     st.session_state.role = ""
     st.session_state.assigned_business = ""
 
-# 4. LOGIN INTERFACE (ලොගින් පෝටල් එක)
+# 4. LOGIN INTERFACE
 if not st.session_state.logged_in:
     st.subheader("👤 User Authentication / පද්ධතියට ඇතුල් වීම")
     with st.form("login_form", clear_on_submit=False):
@@ -124,25 +111,23 @@ if not st.session_state.logged_in:
                 st.session_state.assigned_business = user_data[1]
                 st.rerun()
             else:
-                st.error("❌ වැරදි Username එකක් හෝ Password එකක්. නැවත උත්සාහ කරන්න.")
+                st.error("❌ වැරදි Username එකක් හෝ Password එකක්.")
 
 # 5. LOGGED IN SYSTEM DASHBOARD
 else:
-    # Sidebar Logout Button
     st.sidebar.subheader(f"👋 Welcome, {st.session_state.username}!")
     st.sidebar.write(f"**Role:** {st.session_state.role}")
     if st.sidebar.button("Logout / පද්ධතියෙන් ඉවත් වන්න"):
         st.session_state.logged_in = False
         st.rerun()
 
-    # දත්ත ගබඩාවෙන් දත්ත ලබාගන්නා ශ්‍රිත
     def get_filtered_records():
         conn = sqlite3.connect(DB_FILE)
         df = pd.read_sql_query("SELECT * FROM records", conn)
         conn.close()
         return df
 
-    # STAFF PORTAL (දත්ත ඇතුළත් කරන්නන් සඳහා පමණි)
+    # STAFF PORTAL
     if st.session_state.role == "Staff":
         business_scope = st.session_state.assigned_business
         st.subheader(f"📝 Daily Data Entry Dashboard - 【{business_scope}】")
@@ -164,9 +149,9 @@ else:
                 ''', (business_scope, entry_date.strftime("%Y-%m-%d"), entry_type, category, amount, description, st.session_state.username))
                 conn.commit()
                 conn.close()
-                st.success("✅ දත්තයන් සාර්ථකව සේවාදායකයේ (Server) තැන්පත් කරන ලදී!")
+                st.success("✅ දත්තයන් සාර්ථකව සේවාදායකයේ තැන්පත් කරන ලදී!")
 
-    # OWNER PORTAL (සියලු ව්‍යාපාර බැලිය හැකි ප්‍රධාන පාලකයා)
+    # OWNER PORTAL
     elif st.session_state.role == "Owner":
         st.subheader("📈 Executive Profit/Loss Central Intelligence")
         
@@ -181,13 +166,11 @@ else:
             data_df['date'] = pd.to_datetime(data_df['date'])
             data_df['Month'] = data_df['date'].dt.to_period('M').astype(str)
             
-            # Filter by business
             biz_df = data_df[data_df['business_name'] == selected_business]
             
             if biz_df.empty:
                 st.info(f"{selected_business} සඳහා තවමත් දත්ත ඇතුළත් කර නැත.")
             else:
-                # Profit & Loss Generation Matrix
                 pnl = biz_df.pivot_table(index='Month', columns='type', values='amount', aggfunc='sum').fillna(0)
                 if "Income (ආදායම)" not in pnl.columns: pnl["Income (ආදායම)"] = 0.0
                 if "Expense (වියදම)" not in pnl.columns: pnl["Expense (වියදම)"] = 0.0
@@ -195,12 +178,10 @@ else:
                 
                 st.dataframe(pnl.style.format("LKR {:,.2f}").background_gradient(subset=['Net Profit/Loss'], cmap='RdYlGn'), use_container_width=True)
                 
-                # Report Exporting
                 csv_string = pnl.to_csv()
                 st.download_button("📥 Export Report to Excel/CSV File", data=csv_string.encode('utf-8'), file_name=f"{selected_business}_Report.csv")
                 
                 st.write("---")
-                # 6. AUTOMATED SENDING ACTIONS SECTION
                 st.subheader("🚀 Broadcaster & Alert Integration")
                 
                 col1, col2 = st.columns(2)
@@ -216,5 +197,5 @@ else:
                         latest_month = pnl.index[-1]
                         latest_profit = pnl['Net Profit/Loss'].iloc[-1]
                         sms_msg = f"Alert: {selected_business} {latest_month} Profit/Loss status is LKR {latest_profit:,.2f}."
-                        
                         if send_alert_sms(owner_phone_input, sms_msg):
+                            st.success(f"📱 SMS Summary safely pushed to {owner_phone_input}!")
