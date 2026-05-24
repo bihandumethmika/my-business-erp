@@ -9,7 +9,7 @@ from email import encoders
 from datetime import datetime
 
 # 1. DATABASE SETUP
-DB_FILE = "uthsahaya_erp_v12.db"
+DB_FILE = "uthsahaya_erp_v13.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -60,7 +60,7 @@ def send_monthly_report_email(receiver_email, business_name, report_csv_string, 
     msg.attach(part)
     
     try:
-        server = smtplib.SMTP_SSL('://gmail.com', 465) # Switched to SSL port 465 for cloud compatibility
+        server = smtplib.SMTP_SSL('://gmail.com', 465)
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, receiver_email, msg.as_string())
         server.quit()
@@ -68,29 +68,12 @@ def send_monthly_report_email(receiver_email, business_name, report_csv_string, 
     except Exception as e:
         return False, str(e)
 
-# 3. PAGE INITIALIZATION & ADVANCED GRAPHICS STYLING
+# 3. PAGE INITIALIZATION
 st.set_page_config(page_title="Uthsahaya Group ERP", layout="wide")
 
-# Custom Premium Styling Injection
-st.markdown("""
-    <style>
-    .main { background-color: #0f111a; }
-    .hero-banner { background: linear-gradient(135deg, #1b1f38 0%, #0d1021 100%); padding: 40px; border-radius: 15px; text-align: center; border: 1px solid #ffd700; margin-bottom: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-    .hero-title { color: #ffd700; font-family: 'Helvetica Neue', sans-serif; font-weight: 800; font-size: 36px; margin: 0; text-transform: uppercase; letter-spacing: 2px; text-shadow: 2px 2px 4px rgba(0,0,0,0.6); }
-    .hero-subtitle { color: #a3a8b4; font-size: 14px; margin-top: 5px; }
-    .stButton>button { background: linear-gradient(90deg, #ffd700 0%, #cca100 100%); color: #000000; font-weight: bold; border-radius: 8px; border: none; transition: 0.3s; padding: 10px; width: 100%; }
-    .stButton>button:hover { transform: scale(1.02); box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); color: #000000; }
-    .premium-card { background-color: #161b2e; padding: 20px; border-radius: 12px; border-top: 4px solid #ffd700; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 20px; }
-    </style>
-""", unsafe_allowed_html=True)
-
-# Top Graphical Animated/Style Banner instead of plain text
-st.markdown("""
-    <div class="hero-banner">
-        <div class="hero-title">🔱 Uthsahaya Holdings</div>
-        <div class="hero-subtitle">Premium Multi-Business Enterprise Financial Intelligence Ledger</div>
-    </div>
-""", unsafe_allowed_html=True)
+st.title("🔱 Uthsahaya Holdings Management System")
+st.write("Automated Multi-Business Financial Intelligence & Registry System")
+st.write("---")
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -106,36 +89,32 @@ businesses_list = [
 
 # 4. LOGIN PORTAL
 if not st.session_state.logged_in:
-    col_left, col_mid, col_right = st.columns([1, 2, 1])
-    with col_mid:
-        st.markdown("<div class='premium-card'>", unsafe_allowed_html=True)
-        st.subheader("🔒 Secure Gateway Authorization")
-        with st.form("login_form", clear_on_submit=False):
-            username_input = st.text_input("📊 User ID / පරිශීලක නාමය")
-            password_input = st.text_input("🔑 Security Key / මුරපදය", type="password")
-            login_btn = st.form_submit_button("VALIDATE IDENTITY")
+    st.subheader("🔒 Secure Portal Gateway / ඇතුල් වීම")
+    with st.form("login_form", clear_on_submit=False):
+        username_input = st.text_input("📊 User ID / පරිශීලක නාමය")
+        password_input = st.text_input("🔑 Security Key / මුරපදය", type="password")
+        login_btn = st.form_submit_button("LOGIN")
+        
+        if login_btn:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            c.execute("SELECT role FROM users WHERE username=? AND password=?", (username_input, password_input))
+            user_data = c.fetchone()
+            conn.close()
             
-            if login_btn:
-                conn = sqlite3.connect(DB_FILE)
-                c = conn.cursor()
-                c.execute("SELECT role FROM users WHERE username=? AND password=?", (username_input, password_input))
-                user_data = c.fetchone()
-                conn.close()
-                
-                if user_data:
-                    st.session_state.logged_in = True
-                    st.session_state.username = username_input
-                    st.session_state.role = user_data[0]
-                    st.rerun()
-                else:
-                    st.error("❌ Invalid Access Credentials.")
-        st.markdown("</div>", unsafe_allowed_html=True)
+            if user_data:
+                st.session_state.logged_in = True
+                st.session_state.username = username_input
+                st.session_state.role = user_data
+                st.rerun()
+            else:
+                st.error("❌ Invalid Access Credentials.")
 
 # 5. LOGGED IN DASHBOARD
 else:
-    st.sidebar.markdown(f"<div style='text-align:center; padding:10px; background-color:#161b2e; border-radius:10px; border-left:4px solid #ffd700;'><h4>👤 {st.session_state.username.upper()}</h4><p style='color:#a3a8b4;margin:0;'>Access Level: <b>{st.session_state.role}</b></p></div>", unsafe_allowed_html=True)
-    st.sidebar.write("---")
-    if st.sidebar.button("🔒 SECURE LOGOUT"):
+    st.sidebar.title(f"👤 {st.session_state.username}")
+    st.sidebar.write(f"**Role:** {st.session_state.role}")
+    if st.sidebar.button("🔒 LOGOUT"):
         st.session_state.logged_in = False
         st.rerun()
 
@@ -147,10 +126,8 @@ else:
 
     # STAFF PORTAL (ANY USER CAN SELECT ANY BUSINESS TO ADD DATA)
     if st.session_state.role == "Staff":
-        st.markdown("<div class='premium-card'>", unsafe_allowed_html=True)
         st.subheader("📝 Daily Data Entry Desk (දිනපතා ආදායම්/වියදම් ඇතුළත් කිරීම)")
-        target_business = st.selectbox("🎯 ව්‍යාපාරය තෝරන්න (Select Target Corporate Unit)", businesses_list)
-        st.markdown("</div>", unsafe_allowed_html=True)
+        target_business = st.selectbox("🎯 ව්‍යාපාරය තෝරන්න (Select Business to Add Data)", businesses_list)
         
         with st.form("staff_entry_form", clear_on_submit=True):
             col_a, col_b = st.columns(2)
@@ -180,11 +157,10 @@ else:
         tabs = st.tabs(["📊 Financial Analytics HQ", "📝 Master Data Entry Gates", "⚙️ Staff User Settings"])
         
         # TAB 1: FINANCIAL REPORTS FOR OWNER
-        with tabs[0]:
-            st.markdown("<div class='premium-card'>", unsafe_allowed_html=True)
-            st.subheader("📈 Executive Intelligence Headquarters & Auditing")
+        with tabs:
+            st.subheader("📈 Executive Command Headquarters & Analytics")
             selected_business = st.selectbox("🎯 View Audits For", businesses_list)
-            st.markdown("</div>", unsafe_allowed_html=True)
+            st.write("---")
             
             data_df = get_filtered_records()
             biz_df = data_df[data_df['business_name'] == selected_business] if not data_df.empty else pd.DataFrame()
@@ -205,6 +181,41 @@ else:
                 m_col1, m_col2, m_col3 = st.columns(3)
                 m_col1.metric(f"📈 Total Revenue ({latest_month})", f"LKR {pnl['Income (ආදායම)'].iloc[-1]:,.2f}")
                 m_col2.metric("📉 Total Expense", f"LKR {pnl['Expense (වියදම)'].iloc[-1]:,.2f}")
+                m_col3.metric("🔱 Net Profit / Loss", f"LKR {pnl['Net Profit/Loss'].iloc[-1]:,.2f}")
                 
-                net_val = pnl['Net Profit/Loss'].iloc[-1]
-                m_col3.metric("🔱 Net Profit / Loss", f"LKR {net_val:,.2f}", delta=f"{net_val:,.2f}", delta_color="normal")
+                st.write("---")
+                st.write("#### 📊 Financial Trend Projections Graph")
+                st.bar_chart(pnl[['Income (ආදායම)', 'Expense (වියදම)', 'Net Profit/Loss']])
+                
+                st.write("#### 📑 Ledger Overview Matrix Table")
+                formatted_pnl = pnl.map(lambda x: f"LKR {x:,.2f}")
+                st.dataframe(formatted_pnl, use_container_width=True)
+                
+                csv_string = pnl.to_csv()
+                st.download_button("📥 DOWNLOAD AUDITED STATEMENT (.CSV)", data=csv_string.encode('utf-8'), file_name=f"{selected_business}_Report.csv")
+                
+                st.write("---")
+                st.subheader("🚀 Central Automated Notification Gateway")
+                
+                st.info("💡 Email යැවීමට ප්‍රථමයෙන් ඔබගේ Sender Gmail ලිපිනය සහ App Password එක පහතින් ඇතුළත් කරන්න.")
+                col_em1, col_em2 = st.columns(2)
+                with col_em1:
+                    sys_email = st.text_input("Your Gmail Address (Sender)", "example@gmail.com")
+                with col_em2:
+                    sys_password = st.text_input("Your Gmail App Password", type="password")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    owner_email_input = st.text_input("Enter Destination Email Address", "owner@example.com")
+                    if st.button("📧 BROADCAST STATEMENT VIA EMAIL"):
+                        if sys_email == "example@gmail.com" or sys_password == "":
+                            st.error("⚠️ කරුණාකර ඔබගේ නිවැරදි Sender Email සහ App Password එක ඇතුළත් කරන්න.")
+                        else:
+                            success, msg = send_monthly_report_email(owner_email_input, selected_business, csv_string, sys_email, sys_password)
+                            if success:
+                                st.success(f"📬 Report safely dispatched to {owner_email_input}!")
+                            else:
+                                st.error(f"❌ Email Connection Error: {msg}. Please verify your Gmail App Password.")
+                with col2:
+                    owner_phone_input = st.text_input("Enter Mobile Target Line", "077XXXXXXXX")
+
