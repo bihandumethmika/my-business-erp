@@ -9,7 +9,7 @@ from email import encoders
 from datetime import datetime
 
 # 1. DATABASE & SECURITY SETUP
-DB_FILE = "business_finance_v2.db"
+DB_FILE = "business_finance_v3.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -161,7 +161,7 @@ else:
         data_df = get_filtered_records()
         
         if data_df.empty:
-            st.warning("පද්ධතිය තුළ තවමත් කිසිදු මූල්‍ය දත්තයක් ගබඩා වී නොමැත.")
+            st.warning("පද්ධතිය තුළ තවමත් කිසිදු මූල්‍ය දත්තයක් ගබඩා වී නොමැත. කරුණාකර Staff ගිණුමකින් දත්ත කිහිපයක් ඇතුළත් කර බලන්න.")
         else:
             data_df['date'] = pd.to_datetime(data_df['date'])
             data_df['Month'] = data_df['date'].dt.to_period('M').astype(str)
@@ -176,7 +176,9 @@ else:
                 if "Expense (වියදම)" not in pnl.columns: pnl["Expense (වියදම)"] = 0.0
                 pnl['Net Profit/Loss'] = pnl['Income (ආදායම)'] - pnl['Expense (වියදම)']
                 
-                st.dataframe(pnl.style.format("LKR {:,.2f}").background_gradient(subset=['Net Profit/Loss'], cmap='RdYlGn'), use_container_width=True)
+                # Format to text strings to avoid display matrix render crashes
+                formatted_pnl = pnl.map(lambda x: f"LKR {x:,.2f}")
+                st.dataframe(formatted_pnl, use_container_width=True)
                 
                 csv_string = pnl.to_csv()
                 st.download_button("📥 Export Report to Excel/CSV File", data=csv_string.encode('utf-8'), file_name=f"{selected_business}_Report.csv")
